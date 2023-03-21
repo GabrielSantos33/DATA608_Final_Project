@@ -1,0 +1,102 @@
+---
+title: "Data 608 - Proposal Final Project"
+author: "Gabriel Santos"
+date: "2023-03-22"
+output:
+  pdf_document: default
+---
+
+
+
+**Motor Vehicle Collisions Analysis**
+
+The goal of my final project is to visualize the motor vehicle collisions crash in New York City.
+
+I want to be able to show through graphs an analysis of the crashes of the last 5 years. Identify which days of the week there are more crashes. Identify which months have more crashes. Identify crash by time of day. Identify which boroughs have the most number of crashes.
+
+I think this analysis is revealing since we can identify where more crashes are occurring and be able to suggest policies to reduce the number of crashes.
+We can also find out if we have improved in the policies implemented in recent years or if new policies should be proposed to reduce crashes.
+We can generate training to reduce crashes according to the factors that present more frequency in ls crash.
+
+
+
+
+**Data source**
+
+The dataset I plan to use for my final project are: Motor Vehicle Collisions - Crashes, from NYC Open Data.
+
+Link: <https://data.cityofnewyork.us/Public-Safety/Motor-Vehicle-Collisions-Crashes/h9gi-nx95>
+
+The Motor Vehicle Crash Data Tables contain information on all police-reported motor vehicle collisions in New York City. 
+It has data on the date and time of the accident. In which borough the accident occurred. If they show up injured or dead.The factor that contributed to the accident. The type of vehicle. Among other data.
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(readr)
+library(gridExtra)
+library(scales)
+library(lubridate)
+library(ggrepel)
+library(rgdal)
+library(plotly)
+library(kableExtra)
+library(shiny)
+```
+
+```{r message=FALSE, warning=FALSE}
+url_data <- "https://raw.githubusercontent.com/chinedu2301/data608-project/main/data/motor_crash_df.csv"
+crash_df <- read.csv(url_data)
+crash_df <- as_tibble(crash_df) 
+```
+
+```{r}
+colnames(crash_df)
+```
+
+```{r}
+nrow(crash_df)
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+crash_df$crash_date <- as.Date(crash_df$crash_date, format = "%Y-%m-%d")
+crash_df %>% head(10)
+```
+
+
+
+
+**Methodology**
+
+The final project will be done by RStudio(.rmd) and I will create a visualization in shinyApp, using Plotly.
+To see the frequencies and types of crashes that occur, also to be able to analyze in which borough more crashes occur.
+
+The libraries I plan to use are:
+
+- library(tidyverse)
+- library(readr)
+- library(plotly)
+- library(gridExtra)
+- library(kableExtra)
+- library(lubridate)
+- library(ggrepel)
+- library(rgdal)
+- library(scales)
+- library(shiny)
+
+
+
+
+**Visualization**
+
+- View crash for the last 5 years.
+- Amount of crash according to the day of the week.
+- Which quarters have more crashes per year.
+- crash by time of day.
+- Which boroughs have more number of crashes.
+
+
+**Conclusion**
+
+Present the conclusions according to the graphs made and thus be able to identify the data proposed for this project.
+
