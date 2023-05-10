@@ -1,0 +1,322 @@
+---
+title: "Data 608 - Final Project"
+author: "Gabriel Santos"
+date: "2023-05-10"
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **Motor Vehicle Collisions Analysis**
+
+The goal of my final project is to visualize the motor vehicle collisions crash in New York City.
+
+I want to be able to show through graphs an analysis of the crashes of the last 4 years. Identify which days of the week there are more crashes. Identify which months have more crashes. Identify crash by time of day. Identify which boroughs have the most number of crashes.
+
+I think this analysis is revealing since we can identify where more crashes are occurring and be able to suggest policies to reduce the number of crashes.
+We can also find out if we have improved in the policies implemented in recent years or if new policies should be proposed to reduce crashes.
+We can generate training to reduce crashes according to the factors that present more frequency in ls crash.
+
+
+# Libraries
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(gridExtra)
+library(scales)
+library(lubridate)
+library(ggrepel)
+library(rgdal)
+library(plotly)
+library(kableExtra)
+library(viridis)
+library(shiny)
+```
+
+
+# Data
+
+**Data source**
+
+The dataset I plan to use for my final project are: Motor Vehicle Collisions - Crashes, from NYC Open Data.
+
+Link: <https://data.cityofnewyork.us/Public-Safety/Motor-Vehicle-Collisions-Crashes/h9gi-nx95>
+
+The Motor Vehicle Crash Data Tables contain information on all police-reported motor vehicle collisions in New York City. 
+It has data on the date and time of the accident. In which borough the accident occurred. If they show up injured or dead.The factor that contributed to the accident. The type of vehicle. Among other data.
+
+
+
+```{r message=FALSE, warning=FALSE}
+url_data <- "https://raw.githubusercontent.com/GabrielSantos33/DATA608_Final_Project/main/Data_Motor_Vehicle_Collisions_Crashes.csv"
+crash_df <- read.csv(url_data)
+crash_df <- as_tibble(crash_df) 
+```
+
+
+Change the crash_date data type to date format and View the head of the data:
+
+```{r}
+crash_df$crash_date <- as.Date(crash_df$crash_date, format = "%m/%d/%Y")
+crash_df %>% head(10)
+
+```
+
+
+Take a glimpse of the data:
+
+```{r}
+glimpse(crash_df)
+```
+
+## Car crashes by year
+
+Let’s analyze car accidents in recent years:
+
+```{r fig.height=6, fig.width=8, warning=FALSE}
+crash_df$year <- year(crash_df$crash_date) 
+crash_df %>%
+        ggplot(aes(x=as.factor(year))) + geom_bar(stat='count', fill='royalblue4') +
+        scale_y_continuous(labels=comma) + labs(x='Year', y='No of Incident', title='Incidents by year') + 
+        geom_label(stat = "count", aes(label = ..count.., y = ..count..)) + 
+        theme(axis.title = element_text(size = 10), plot.title = element_text(size = 15,
+        hjust = 0.7), panel.background = element_rect(fill = "white")) +
+        labs(title = "Incidents by Year", y = "Quantity of Incidents")
+```
+
+According to the graph we can see that incidents have decreased year after year.
+In 2019 there were 137,024, while in 2022 there were 45,968.
+Possibly one cause for having such a high difference between 2019 and 2020 is that the pandemic occurred in 2020, and we had several months in which people decreased their transit.
+
+Many people worked from their homes.
+
+
+## Car crash by quarter
+
+
+```{r fig.height=6, fig.width=8}
+crash_df$quarter <- quarter(crash_df$crash_date) 
+q1 <- crash_df %>% filter(year!=2018) %>% select(year, quarter) %>% group_by(year) %>% count(quarter) %>%
+        ggplot(aes(x=as.factor(quarter), y=n, fill = quarter)) + 
+        geom_bar(stat='identity') + scale_y_continuous(labels=comma) + facet_grid(.~year) + 
+        labs(x='Quarter', y='Number of incidents', title='Incidents by Quarter') 
+q1 + scale_fill_viridis() + theme(axis.title = element_text(size = 13),
+      plot.title = element_text(size = 13,
+      hjust = 0.7), panel.background = element_rect(fill = "white"))
+```
+
+According to the graph we can see that the second quarter (April, May and June) are the months with the most incidents.
+For the year 2020, the decrease was affected by the pandemic and it was the months that Lockdown occurred.
+
+## Car crashes by weekdays
+
+
+```{r fig.height=6, fig.width=8}
+crash_df$weekday <- wday(crash_df$crash_date, label=TRUE)
+crash_df %>% count(weekday) %>%
+        ggplot(aes(x=weekday, y=n)) + geom_bar(stat='identity', fill=4) +
+        scale_y_continuous(labels=comma) +
+        labs(x='Weekday', y='Number of incidents', title='Incidents by Weekday') + 
+        theme(axis.title = element_text(size = 13),
+        plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "white"))
+```
+
+According to the graph, on Friday there are more incidents on Friday.
+
+Fridays can have more traffic incidents due to a combination of factors, including increased traffic, fatigue and stress from the work week, and alcohol use.
+
+
+
+## Crash incidents by Time of Day
+ 
+Extract time of day from the data:
+
+```{r}
+time <- as.POSIXct(strptime(c(crash_df$crash_time), "%H:%M"), "UTC")
+x=as.POSIXct(strptime(c("0000","0600","1200","1500","2000","2359"), "%H%M"),"UTC")
+labs=c("night","morning","afternoon","evening","night")
+day_time <- labs[findInterval(time,x)]
+crash_df$day_time <- c(day_time)
+print(crash_df)
+```
+
+```{r}
+day_time_df <- crash_df %>% group_by(day_time) %>% summarise(count_incidents = n()) 
+day_time_df
+```
+
+
+```{r fig.height=6, fig.width=8}
+day_time_df %>% ggplot(aes(x=reorder(day_time, count_incidents), y=count_incidents)) + 
+        geom_bar(stat='identity', fill='deepskyblue4') +
+        scale_y_continuous(labels=comma) +
+        labs(x='new_time', y='Number of incidents', title='Incidents by time') + theme(axis.title = element_text(size = 13),
+        plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "white")) +
+        labs(title = "Incidents by time of day", x = "time_of_day")
+```
+
+
+We can see that at night are the times with the most incidents, from 8 pm to 12 am (midnight).
+
+
+##  Crash Incident by Borough
+
+
+```{r fig.height=6, fig.width=8}
+plotly::ggplotly(crash_df %>% count(borough) %>%
+        ggplot(aes(x=reorder(borough, n), y=n, fill=n, text=borough)) +
+        geom_bar(stat='identity', fill='springgreen4') +
+        labs(x='', y='Number of crashes'),
+        tooltip=c("text", "y"))
+```
+
+Brooklyn is the Borough with the most accidents.
+
+
+## Top 10 incidents by number of victims
+
+```{r}
+crash_df$victims <- crash_df$number_killed + crash_df$number_injured
+Top10 <- crash_df %>% 
+  select(crash_date, borough, number_killed, number_injured, victims) %>% 
+         arrange(desc(victims)) %>% top_n(n=10, wt=victims)
+Top10
+```
+
+
+## Victims per crash incident
+
+```{r}
+crash_df$victims <- crash_df$number_killed + crash_df$number_injured
+VictimsByborough <- crash_df %>% group_by(borough)  %>%   
+                    summarize(sumVic=sum(victims), sumInj=sum(number_injured), sumDeath=sum(number_killed),
+                              PercDeath=round(sumDeath/sumVic,3), sumIncidents=n(), 
+                              vicPerInc=round(sumVic/sumIncidents,1)) %>% arrange(desc(sumVic))
+VictimsByborough
+```
+
+```{r fig.height=6, fig.width=12}
+ggplotly(crash_df %>% count(contributing_factor) %>%
+        ggplot(aes(x=contributing_factor, y=n, fill=n, text=contributing_factor)) +
+        geom_bar(stat='identity', fill='darkred') + theme(axis.text.x = element_text(angle = 45, hjust = 2)) +
+        labs(x='', y='Number of crashes'),
+         tooltip=c("text", "y"))
+```
+
+
+# Conclusion
+
+We can review the data in each graph, or in our interactive graphs made in Shinny app.
+
+
+```{r}
+df <- crash_df
+choices <- c("Incidents by Year", "Incidents by Quarter", "Incidents by Weekday", "Incidents by Time of Day", "Incidents by Borough", "Victims per Factor")
+```
+
+
+```{r shinny1}
+ui <- fluidPage(
+  tabsetPanel( 
+    tabPanel(title = "Vehicular Incidents in NYC (New York City)",
+      sidebarPanel(
+        htmlOutput('message_q1'),
+        selectInput('plotType', 'Plot to Display', 
+                  unique(choices), selected= choices[0],width = 500)
+      ),
+      mainPanel(plotlyOutput('plot1_q1'))
+    )
+    ))
+server <- function(input, output, session) {
+  data_year <- reactive({
+    df2 <- df %>%
+        ggplot(aes(x=as.factor(year))) + geom_bar(stat='count', fill='royalblue4') +
+        scale_y_continuous(labels=comma) + labs(x='Year', y='No of Incident', title='Incidents by year') + 
+        geom_label(stat = "count", aes(label = ..count.., y = ..count..)) + 
+        theme(axis.title = element_text(size = 13), plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "White")) +
+        labs(title = "Incidents by Year", y = "No of Incidents")
+    df2
+  })
+  
+  data_quarter <- reactive({
+    df2 <- df %>% filter(year!=2013) %>% select(year, quarter) %>% group_by(year) %>% count(quarter) %>%
+        ggplot(aes(x=as.factor(quarter), y=n, fill = quarter)) + 
+        geom_bar(stat='identity') + scale_y_continuous(labels=comma) + facet_grid(.~year) + 
+        labs(x='Quarter', y='Number of incidents', title='Incidents by Quarter') + scale_fill_viridis() + 
+        theme(axis.title = element_text(size = 13),
+        plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "white"))
+    
+  })
+  
+  data_weekday <- reactive({
+    df2 <- df %>% count(weekday) %>%
+        ggplot(aes(x=weekday, y=n)) + geom_bar(stat='identity', fill=4) +
+        scale_y_continuous(labels=comma) +
+        labs(x='Weekday', y='Number of incidents', title='Incidents by Weekday') + 
+        theme(axis.title = element_text(size = 13),
+        plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "white"))
+    
+  })
+  data_timeofday <- reactive({
+    df2 <- day_time_df %>% ggplot(aes(x=reorder(day_time, count_incidents), y=count_incidents)) + 
+        geom_bar(stat='identity', fill='deepskyblue4') +
+        scale_y_continuous(labels=comma) +
+        labs(x='new_time', y='Number of incidents', title='Incidents by time') + theme(axis.title = element_text(size = 13),
+        plot.title = element_text(size = 13,
+        hjust = 0.7), panel.background = element_rect(fill = "white")) +
+        labs(title = "Incidents by time of day", x = "time_of_day")
+    
+  })    
+  
+  data_borough <- reactive({
+    df2 <- plotly::ggplotly(df %>% count(borough) %>%
+        ggplot(aes(x=reorder(borough, n), y=n, fill=n, text=borough)) +
+        geom_bar(stat='identity', fill='springgreen4') +
+        labs(x='', y='Number of crashes'),
+        tooltip=c("text", "y")) 
+        
+  })
+  
+  data_victims <- reactive({
+    df2 <- ggplotly(df %>% count(contributing_factor) %>%
+        ggplot(aes(x=contributing_factor, y=n, fill=n, text=contributing_factor)) +
+        geom_bar(stat='identity', fill='darkred') + theme(axis.text.x = element_text(angle = 45, hjust = 0.8)) +
+        labs(x='', y='Number of crashes'),
+         tooltip=c("text", "y"))
+    
+  })
+  
+  output$plot1_q1 <- renderPlotly({
+    if (input$plotType == "Incidents by Year"){
+      df2 <- data_year()
+    } else if(input$plotType == "Incidents by Quarter"){
+      df2 <- data_quarter()
+    } else if(input$plotType == "Incidents by Weekday"){
+      df2 <- data_weekday()
+    } else if(input$plotType == "Incidents by Time of Day"){
+      df2 <- data_timeofday()
+    } else if(input$plotType == "Incidents by Borough"){
+      df2 <- data_borough()
+    } else{
+      df2 <- data_victims()
+    }
+  }
+  
+  )
+}
+shinyApp(ui = ui, server = server)
+```
